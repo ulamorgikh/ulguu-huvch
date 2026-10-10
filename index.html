@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8">
+  <title>Монгол Найман Утас - Бүрэн Эргэлтийн Горим</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 12px;
+      background: #06090e;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      touch-action: none;
+      user-select: none;
+    }
+    .nav-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      background: #111827;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid #374151;
+    }
+    .layer-btn {
+      background: #1f2937;
+      color: #9ca3af;
+      border: 1px solid #4b5563;
+      padding: 7px 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12.5px;
+    }
+    .layer-btn.active {
+      background: #38bdf8;
+      color: #030712;
+      border-color: #38bdf8;
+    }
+    .sub-controls {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 10px;
+      background: #0f172a;
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      font-size: 13px;
+    }
+    .sub-controls label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .mode-btn {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .mode-btn.tuv {
+      background: #d97706;
+    }
+    .main-container {
+      display: flex;
+      gap: 15px;
+      align-items: flex-start;
+    }
+    canvas {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+      cursor: crosshair;
+    }
+    .table-panel {
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      width: 500px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th {
+      color: #94a3b8;
+      font-weight: 600;
+      padding: 8px 6px;
+      border-bottom: 1px solid #334155;
+      font-size: 11.5px;
+    }
+    td {
+      padding: 7px 6px;
+      border-bottom: 1px solid #1e293b;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row-title {
+      font-family: sans-serif;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="nav-bar">
+    <button class="layer-btn active" onclick="setLayer(1)">1. Найман утас</button>
+    <button class="layer-btn" onclick="setLayer(2)">2. Бүхэл тоон өнцгүүд</button>
+    <button class="layer-btn" onclick="setLayer(3)">3. Онцгой өнцгүүд (30°/45°)</button>
+    <button class="layer-btn" onclick="setLayer(4)">4. Эйлерийн ертөнц</button>
+  </div>
+
+  <div class="sub-controls">
+    <label>
+      <input type="checkbox" id="pairMode" onchange="draw()"> <b>Хос утас</b>
+    </label>
+
+    <label>
+      <input type="checkbox" id="exactMode" onchange="draw()"> <b>Яг таг утга (s)</b>
+    </label>
+
+    <!-- Бүрэн 360 градус эргүүлэх чагт -->
+    <label>
+      <input type="checkbox" id="fullRotationMode" onchange="draw()"> <b style="color: #38bdf8;">Бүрэн эргэлт (360°)</b>
+    </label>
+
+    <button id="tuvToggle" class="mode-btn" onclick="toggleTuvMode()">Горим: Өлгүү (босоо)</button>
+    <b id="angleText" style="color: #facc15;">φ = 45°</b>
+  </div>
+
+  <div class="main-container">
+    <canvas id="canvas" width="620" height="620"></canvas>
+
+    <div class="table-panel">
+      <h3 style="margin:0; font-size:13.5px; color:#cbd5e1; border-bottom:1px solid #334155; padding-bottom:5px;">
+        Утас, Химцаа ба Функцийн Тоон Утгууд
+      </h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Утасны нэр</th>
+            <th>Бодит хэмжээ</th>
+            <th id="thRatio">Харьцаа (/D) [d]</th>
+            <th>Функцийн нэршил</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: rgba(56, 189, 248, 0.06);">
+            <td><span class="row-title" style="color:#38bdf8;"><span class="dot" style="background:#38bdf8;"></span> Харагдах масштаб (Zoom)</span></td>
+            <td id="zoomVal" style="color:#38bdf8; font-weight:bold;">1.00 ×</td>
+            <td style="color:#94a3b8;">Автомат алслалт</td>
+            <td style="color:#94a3b8;">Дэлгэцэнд багтаах</td>
+          </tr>
+
+          <tr style="background: rgba(255,255,255,0.02);">
+            <td><span class="row-title" style="color:#ffffff;"><span class="dot" style="background:#ffffff;"></span> Диаметр (Тойргийн хэмжээ)</span></td>
+            <td id="lenD">200.0 мм</td>
+            <td id="ratD" style="color:#ffffff; font-weight:bold;">1.00</td>
+            <td style="color:#ffffff; font-weight:bold;">const = 1</td>
+          </tr>
+
+          <tr>
+            <td><span class="row-title" style="color:#ef4444;"><span class="dot" style="background:#ef4444;"></span> Өлгүү хөвч (босоо)</span></td>
+            <td id="lenUlg">141.4 мм</td>
+            <td id="ratUlg" style="color:#facc15; font-weight:bold;">0.71</td>
+            <td id="fnUlg" style="color:#ef4444; font-weight:bold;">өхө = sin φ</td>
+          </tr>
+
+          <tr>
+            <td><span class="row-title" style="color:#3b82f6;"><span class="dot" style="background:#3b82f6;"></span> Төв хөвч (хэвтээ)</span></td>
+            <td id="lenTuv">141.4 мм</td>
+            <td id="ratTuv" style="color:#facc15; font-weight:bold;">0.71</td>
+            <td id="fnTuv" style="color:#3b82f6; font-weight:bold;">төхө = cos φ</td>
+          </tr>
+
+          <tr>
+            <td><span class="row-title" id="titleShah" style="color:#10b981;"><span class="dot" id="dotShah" style="background:#10b981;"></span> Шахагч химцаа</span></td>
+            <td id="lenShah">200.0 мм</td>
+            <td id="ratShah" style="color:#facc15; font-weight:bold;">1.00</td>
+            <td id="fnShah" style="color:#10b981; font-weight:bold;">өша = tan φ</td>
+          </tr>
+
+          <tr>
+            <td><span class="row-title" id="titleOgt" style="color:#c084fc;"><span class="dot" id="dotOgt" style="background:#c084fc;"></span> Огтлогч химцаа</span></td>
+            <td id="lenOgt">282.8 мм</td>
+            <td id="ratOgt" style="color:#facc15; font-weight:bold;">1.41</td>
+            <td id="fnOgt" style="color:#c084fc; font-weight:bold;">охи = sec φ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="font-size:11px; color:#94a3b8; line-height: 1.4; background: #070b12; padding: 7px; border-radius: 4px; border: 1px solid #1e293b;">
+        * <b>Бүрэн эргэлт (360°):</b> Сонгосон үед 2 ба 3-р горимд 90°-аас цааш 4 мөчлөг дамжин 360° хүртэл чөлөөтэй эргэнэ.<br/>
+        * <b>3-р горим:</b> Зөвхөн 30° ба 45°-ын давталтууд (0°, 30°, 45°, 60°, 90°, 120°, 135°, ...)-д наалдана.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const angleText = document.getElementById('angleText');
+    const pairMode = document.getElementById('pairMode');
+    const exactMode = document.getElementById('exactMode');
+    const fullRotationMode = document.getElementById('fullRotationMode');
+    const tuvToggle = document.getElementById('tuvToggle');
+    const thRatio = document.getElementById('thRatio');
+
+    const zoomVal = document.getElementById('zoomVal');
+    const lenD = document.getElementById('lenD');
+    const ratD = document.getElementById('ratD');
+    const lenUlg = document.getElementById('lenUlg');
+    const ratUlg = document.getElementById('ratUlg');
+    const fnUlg = document.getElementById('fnUlg');
+
+    const lenTuv = document.getElementById('lenTuv');
+    const ratTuv = document.getElementById('ratTuv');
+    const fnTuv = document.getElementById('fnTuv');
+
+    const titleShah = document.getElementById('titleShah');
+    const lenShah = document.getElementById('lenShah');
+    const ratShah = document.getElementById('ratShah');
+    const fnShah = document.getElementById('fnShah');
+
+    const titleOgt = document.getElementById('titleOgt');
+    const lenOgt = document.getElementById('lenOgt');
+    const ratOgt = document.getElementById('ratOgt');
+    const fnOgt = document.getElementById('fnOgt');
+
+    let currentLayer = 1;
+    let angleRad = Math.PI / 4; // 45°
+    let isTuvMode = false;
+    const BASE_R = 120;
+    const DIAMETER_MM = 200;
+
+    function to2Dec(num) {
+      if (Math.abs(num) < 1e-4) return "0.00";
+      return Number(num).toFixed(2);
+    }
+
+    function toggleTuvMode() {
+      isTuvMode = !isTuvMode;
+      tuvToggle.classList.toggle('tuv', isTuvMode);
+      tuvToggle.innerText = isTuvMode ? "Горим: Түв (хэвтээ)" : "Горим: Өлгүү (босоо)";
+      draw();
+    }
+
+    function setLayer(layer) {
+      currentLayer = layer;
+      document.querySelectorAll('.layer-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === layer);
+      });
+
+      // Хэрэв "Бүрэн эргэлт" чагтлаагүй бол 1, 2, 3-р горимд 90 градус дотор буцаана
+      if (!fullRotationMode.checked && layer <= 3) {
+        if (angleRad > Math.PI / 2) angleRad = Math.PI / 4;
+      }
+      draw();
+    }
+
+    function getExactValue(deg, funcName) {
+      const d = ((Math.round(deg) % 360) + 360) % 360;
+      
+      const table = {
+        0:   { sin: "0", cos: "1", tan: "0", cot: "∞", sec: "1", csc: "∞" },
+        30:  { sin: "1/2", cos: "√3/2", tan: "√3/3", cot: "√3", sec: "2√3/3", csc: "2" },
+        45:  { sin: "√2/2", cos: "√2/2", tan: "1", cot: "1", sec: "√2", csc: "√2" },
+        60:  { sin: "√3/2", cos: "1/2", tan: "√3", cot: "√3/3", sec: "2", csc: "2√3/3" },
+        90:  { sin: "1", cos: "0", tan: "∞", cot: "0", sec: "∞", csc: "1" },
+        120: { sin: "√3/2", cos: "-1/2", tan: "-√3", cot: "-√3/3", sec: "-2", csc: "2√3/3" },
+        135: { sin: "√2/2", cos: "-√2/2", tan: "-1", cot: "-1", sec: "-√2", csc: "√2" },
+        150: { sin: "1/2", cos: "-√3/2", tan: "-√3/3", cot: "-√3", sec: "-2√3/3", csc: "2" },
+        180: { sin: "0", cos: "-1", tan: "0", cot: "∞", sec: "-1", csc: "∞" },
+        210: { sin: "-1/2", cos: "-√3/2", tan: "√3/3", cot: "√3", sec: "-2√3/3", csc: "-2" },
+        225: { sin: "-√2/2", cos: "-√2/2", tan: "1", cot: "1", sec: "-√2", csc: "-√2" },
+        240: { sin: "-√3/2", cos: "-1/2", tan: "√3", cot: "√3/3", sec: "-2", csc: "-2√3/3" },
+        270: { sin: "-1", cos: "0", tan: "∞", cot: "0", sec: "∞", csc: "-1" },
+        300: { sin: "-√3/2", cos: "1/2", tan: "-√3", cot: "-√3/3", sec: "2", csc: "-2√3/3" },
+        315: { sin: "-√2/2", cos: "√2/2", tan: "-1", cot: "-1", sec: "√2", csc: "-√2" },
+        330: { sin: "-1/2", cos: "√3/2", tan: "-√3/3", cot: "-√3", sec: "2√3/3", csc: "-2" },
+        360: { sin: "0", cos: "1", tan: "0", cot: "∞", sec: "1", csc: "∞" }
+      };
+
+      if (table[d] && table[d][funcName]) {
+        return table[d][funcName];
+      }
+      return null;
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width = 3.5) {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 16) return;
+
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      const angle = Math.atan2(dy, dx);
+      const headlen = 7.5;
+
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.lineTo(mx - headlen * Math.cos(angle - Math.PI / 6), my - headlen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(mx - headlen * Math.cos(angle + Math.PI / 6), my - headlen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const x0 = canvas.width / 2;
+      const y0 = canvas.height / 2;
+
+      let phi = angleRad;
+      let rawDeg = (phi * 180 / Math.PI);
+      let deg = Math.round(rawDeg);
+
+      // 3-р горимд 30 ба 45-ын давталтууд дээр шууд наалдах
+      if (currentLayer === 3) {
+        // Хэрэв бүрэн эргэлт чагтлагдсан эсвэл 4-р горим бол 360 хүртэлх бүх давталтууд
+        const allowed = (fullRotationMode.checked || currentLayer === 4)
+          ? [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, 360]
+          : [0, 30, 45, 60, 90];
+
+        let closest = allowed[0];
+        let minDiff = 999;
+        allowed.forEach(a => {
+          let diff = Math.abs(rawDeg - a);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = a;
+          }
+        });
+        deg = closest;
+        phi = (deg * Math.PI) / 180;
+      } else if (currentLayer === 2) {
+        deg = Math.round(rawDeg);
+        phi = (deg * Math.PI) / 180;
+      }
+
+      const cosP = Math.cos(phi);
+      const sinP = Math.sin(phi);
+
+      const isInfTan = Math.abs(cosP) < 1e-3;
+      const isInfCot = Math.abs(sinP) < 1e-3;
+
+      const safeCos = isInfTan ? 1e-4 * Math.sign(cosP || 1) : cosP;
+      const safeSin = isInfCot ? 1e-4 * Math.sign(sinP || 1) : sinP;
+
+      const tanVal = sinP / safeCos;
+      const cotVal = cosP / safeSin;
+      const secVal = 1 / safeCos;
+      const cscVal = 1 / safeSin;
+
+      // Масштаб
+      const activeStretch = isTuvMode ? Math.abs(cotVal) : Math.abs(tanVal);
+      const maxAllowedCanvasH = canvas.height * 0.45;
+      let R = BASE_R;
+      let currentZoom = 1.0;
+
+      if (BASE_R * activeStretch > maxAllowedCanvasH) {
+        R = maxAllowedCanvasH / activeStretch;
+        currentZoom = R / BASE_R;
+      }
+
+      const dx = cosP * R;
+      const dy = sinP * R;
+      const H = R * Math.abs(tanVal);
+      const W = R * Math.abs(cotVal);
+
+      // Тэнхлэг
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y0); ctx.lineTo(canvas.width, y0);
+      ctx.moveTo(x0, 0); ctx.lineTo(x0, canvas.height);
+      ctx.stroke();
+
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      const isPair = pairMode.checked;
+      const isExact = exactMode.checked;
+
+      // Суурь тойрог
+      ctx.beginPath();
+      ctx.arc(x0, y0, R, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Багтсан дөрвөлжин
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x0 - absX, y0 - absY, 2 * absX, 2 * absY);
+
+      // Гадаад шүргэсэн дөрвөлжин
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 1.5;
+      if (!isTuvMode) ctx.strokeRect(x0 - R, y0 - H, 2 * R, 2 * H);
+      else ctx.strokeRect(x0 - W, y0 - R, 2 * W, 2 * R);
+
+      // ==========================================
+      // I, II, III ДАВХАРГА: ТЭМДЭГГҮЙ БОДИТ УТАСНУУД
+      // ==========================================
+      if (currentLayer <= 3) {
+        const signX = cosP >= 0 ? 1 : -1;
+        const signY = sinP >= 0 ? 1 : -1;
+
+        // 1. Өлгүү хөвч
+        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(x0 + dx, y0 - absY); ctx.lineTo(x0 + dx, y0 + absY); ctx.stroke();
+        if (isPair) {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+          ctx.beginPath(); ctx.moveTo(x0 - dx, y0 - absY); ctx.lineTo(x0 - dx, y0 + absY); ctx.stroke();
+        }
+
+        // 2. Төв хөвч
+        ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(x0 - absX, y0 - dy); ctx.lineTo(x0 + absX, y0 - dy); ctx.stroke();
+        if (isPair) {
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.45)';
+          ctx.beginPath(); ctx.moveTo(x0 - absX, y0 + dy); ctx.lineTo(x0 + absX, y0 + dy); ctx.stroke();
+        }
+
+        if (!isTuvMode) {
+          // Өлгүү шахагч
+          const posX = x0 + signX * R;
+          const negX = x0 - signX * R;
+          ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.moveTo(posX, y0 + H); ctx.lineTo(posX, y0 - H); ctx.stroke();
+          if (isPair) {
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+            ctx.beginPath(); ctx.moveTo(negX, y0 + H); ctx.lineTo(negX, y0 - H); ctx.stroke();
+          }
+
+          // Өлгүү огтлогч
+          ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(x0 - signX * R, y0 + signY * H); ctx.lineTo(x0 + signX * R, y0 - signY * H); ctx.stroke();
+          if (isPair) {
+            ctx.strokeStyle = 'rgba(192, 132, 252, 0.45)';
+            ctx.beginPath(); ctx.moveTo(x0 - signX * R, y0 - signY * H); ctx.lineTo(x0 + signX * R, y0 + signY * H); ctx.stroke();
+          }
+        } else {
+          // Түв шахагч
+          const posY = y0 - signY * R;
+          const negY = y0 + signY * R;
+          ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.moveTo(x0 - W, posY); ctx.lineTo(x0 + W, posY); ctx.stroke();
+          if (isPair) {
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+            ctx.beginPath(); ctx.moveTo(x0 - W, negY); ctx.lineTo(x0 + W, negY); ctx.stroke();
+          }
+
+          // Түв огтлогч
+          ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(x0 - signX * W, y0 + signY * R); ctx.lineTo(x0 + signX * W, y0 - signY * R); ctx.stroke();
+          if (isPair) {
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
+            ctx.beginPath(); ctx.moveTo(x0 + signX * W, y0 + signY * R); ctx.lineTo(x0 - signX * W, y0 - signY * R); ctx.stroke();
+          }
+        }
+
+        if ((!isTuvMode && isInfTan) || (isTuvMode && isInfCot)) {
+          ctx.font = 'bold 20px sans-serif';
+          ctx.fillStyle = isTuvMode ? '#f59e0b' : '#10b981';
+          ctx.fillText('⋮', x0 + (cosP >= 0 ? R : -R) - 4, y0 - H - 8);
+        }
+
+        // Өнцгийн нум
+        const arcR = Math.min(28, R * 0.4);
+        ctx.beginPath();
+        ctx.arc(x0, y0, arcR, 0, -phi, true);
+        ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2.5; ctx.stroke();
+
+        const midA = phi / 2;
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillStyle = '#facc15';
+        ctx.fillText('φ', x0 + (arcR + 12) * Math.cos(midA) - 4, y0 - (arcR + 12) * Math.sin(midA) + 4);
+
+      } else {
+        // ==========================================
+        // IV ДАВХАРГА: ЭЙЛЕРИЙН ЕРТӨНЦ (ТЭМДЭГТЭЙ)
+        // ==========================================
+        const signX = cosP >= 0 ? 1 : -1;
+        const signY = sinP >= 0 ? 1 : -1;
+        const xRight = x0 + R;
+        const xLeft  = x0 - R;
+
+        if (sinP >= 0) drawArrow(x0 + dx, y0 + absY, x0 + dx, y0 - absY, '#ef4444');
+        else drawArrow(x0 + dx, y0 - absY, x0 + dx, y0 + absY, '#ef4444');
+
+        if (isPair) {
+          if (sinP >= 0) drawArrow(x0 - dx, y0 + absY, x0 - dx, y0 - absY, 'rgba(239, 68, 68, 0.45)');
+          else drawArrow(x0 - dx, y0 - absY, x0 - dx, y0 + absY, 'rgba(239, 68, 68, 0.45)');
+        }
+
+        if (cosP >= 0) drawArrow(x0 - absX, y0 - dy, x0 + absX, y0 - dy, '#3b82f6');
+        else drawArrow(x0 + absX, y0 - dy, x0 - absX, y0 - dy, '#3b82f6');
+
+        if (isPair) {
+          if (cosP >= 0) drawArrow(x0 - absX, y0 + dy, x0 + absX, y0 + dy, 'rgba(59, 130, 246, 0.45)');
+          else drawArrow(x0 + absX, y0 + dy, x0 - absX, y0 + dy, 'rgba(59, 130, 246, 0.45)');
+        }
+
+        if (!isTuvMode) {
+          const activeTanX = signX > 0 ? xRight : xLeft;
+          const oppTanX    = signX > 0 ? xLeft  : xRight;
+
+          if (tanVal >= 0) drawArrow(activeTanX, y0 + H, activeTanX, y0 - H, '#10b981');
+          else drawArrow(activeTanX, y0 - H, activeTanX, y0 + H, '#10b981');
+
+          if (isPair) {
+            if (tanVal >= 0) drawArrow(oppTanX, y0 + H, oppTanX, y0 - H, 'rgba(16, 185, 129, 0.45)');
+            else drawArrow(oppTanX, y0 - H, oppTanX, y0 + H, 'rgba(16, 185, 129, 0.45)');
+          }
+
+          const C_Active = { x: x0 + signX * R, y: y0 - signY * H };
+          const C_Opp    = { x: x0 - signX * R, y: y0 + signY * H };
+          if (secVal >= 0) drawArrow(C_Opp.x, C_Opp.y, C_Active.x, C_Active.y, '#c084fc');
+          else drawArrow(C_Active.x, C_Active.y, C_Opp.x, C_Opp.y, '#c084fc');
+
+          if (isPair) {
+            const C_SecOther1 = { x: x0 - signX * R, y: y0 - signY * H };
+            const C_SecOther2 = { x: x0 + signX * R, y: y0 + signY * H };
+            ctx.strokeStyle = 'rgba(192, 132, 252, 0.35)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(C_SecOther1.x, C_SecOther1.y); ctx.lineTo(C_SecOther2.x, C_SecOther2.y); ctx.stroke();
+          }
+        } else {
+          const yTop = y0 - R;
+          const yBottom = y0 + R;
+          const activeCotY = signY > 0 ? yTop : yBottom;
+          const oppCotY    = signY > 0 ? yBottom : yTop;
+
+          if (cotVal >= 0) drawArrow(x0 - W, activeCotY, x0 + W, activeCotY, '#f59e0b');
+          else drawArrow(x0 + W, activeCotY, x0 - W, activeCotY, '#f59e0b');
+
+          if (isPair) {
+            if (cotVal >= 0) drawArrow(x0 - W, oppCotY, x0 + W, oppCotY, 'rgba(245, 158, 11, 0.45)');
+            else drawArrow(x0 + W, oppCotY, x0 - W, oppCotY, 'rgba(245, 158, 11, 0.45)');
+          }
+
+          const T_Active = { x: x0 - signX * W, y: y0 + signY * R };
+          const T_Opp    = { x: x0 + signX * W, y: y0 - signY * R };
+          if (cscVal >= 0) drawArrow(T_Active.x, T_Active.y, T_Opp.x, T_Opp.y, '#06b6d4');
+          else drawArrow(T_Opp.x, T_Opp.y, T_Active.x, T_Active.y, '#06b6d4');
+
+          if (isPair) {
+            const T_Other1 = { x: x0 - signX * W, y: y0 - signY * R };
+            const T_Other2 = { x: x0 + signX * W, y: y0 + signY * R };
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.35)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(T_Other1.x, T_Other1.y); ctx.lineTo(T_Other2.x, T_Other2.y); ctx.stroke();
+          }
+        }
+
+        const centerArcR = Math.min(30, R * 0.4);
+        ctx.beginPath();
+        ctx.arc(x0, y0, centerArcR, 0, -phi, true);
+        ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2.5; ctx.stroke();
+
+        const midA = phi / 2;
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillStyle = '#facc15';
+        ctx.fillText('φ', x0 + (centerArcR + 14) * Math.cos(midA) - 4, y0 - (centerArcR + 14) * Math.sin(midA) + 4);
+      }
+
+      // Хөдлөгч цэг
+      ctx.beginPath();
+      ctx.arc(x0 + dx, y0 - dy, 6.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff'; ctx.fill();
+      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.stroke();
+
+      // Төв цэг
+      ctx.beginPath(); ctx.arc(x0, y0, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff'; ctx.fill();
+
+      // ==========================================
+      // ХҮСНЭГТИЙН ХАРЬЦАА: [d] vs [s]
+      // ==========================================
+      angleText.innerText = `φ = ${deg}°`;
+      zoomVal.innerText = `${currentZoom.toFixed(2)} ×`;
+
+      thRatio.innerText = isExact ? "Харьцаа (/D) [s]" : "Харьцаа (/D) [d]";
+      ratD.innerText = isExact ? "1" : "1.00";
+
+      const sVal = Math.abs(sinP);
+      const cVal = Math.abs(cosP);
+
+      lenUlg.innerText = `${(sVal * DIAMETER_MM).toFixed(1)} мм`;
+      lenTuv.innerText = `${(cVal * DIAMETER_MM).toFixed(1)} мм`;
+
+      // Өлгүү (sin)
+      if (isExact && getExactValue(deg, 'sin') !== null) {
+        ratUlg.innerText = getExactValue(deg, 'sin');
+      } else {
+        let val = currentLayer === 4 ? sinP : sVal;
+        ratUlg.innerText = to2Dec(val);
+      }
+
+      // Төв (cos)
+      if (isExact && getExactValue(deg, 'cos') !== null) {
+        ratTuv.innerText = getExactValue(deg, 'cos');
+      } else {
+        let val = currentLayer === 4 ? cosP : cVal;
+        ratTuv.innerText = to2Dec(val);
+      }
+
+      if (!isTuvMode) {
+        titleShah.innerHTML = `<span class="dot" style="background:#10b981;"></span> Өлгүү шахагч химцаа`;
+        titleShah.style.color = '#10b981';
+        fnShah.style.color = '#10b981';
+        fnShah.innerText = "өша = tan φ";
+        lenShah.innerText = isInfTan ? "∞" : `${(Math.abs(tanVal) * DIAMETER_MM).toFixed(1)} мм`;
+
+        if (isExact && getExactValue(deg, 'tan') !== null) {
+          ratShah.innerText = getExactValue(deg, 'tan');
+        } else {
+          let val = currentLayer === 4 ? tanVal : Math.abs(tanVal);
+          ratShah.innerText = isInfTan ? "∞" : to2Dec(val);
+        }
+
+        titleOgt.innerHTML = `<span class="dot" style="background:#c084fc;"></span> Өлгүү огтлогч химцаа`;
+        titleOgt.style.color = '#c084fc';
+        fnOgt.style.color = '#c084fc';
+        fnOgt.innerText = "охи = sec φ";
+        lenOgt.innerText = isInfTan ? "∞" : `${(Math.abs(secVal) * DIAMETER_MM).toFixed(1)} мм`;
+
+        if (isExact && getExactValue(deg, 'sec') !== null) {
+          ratOgt.innerText = getExactValue(deg, 'sec');
+        } else {
+          let val = currentLayer === 4 ? secVal : Math.abs(secVal);
+          ratOgt.innerText = isInfTan ? "∞" : to2Dec(val);
+        }
+      } else {
+        titleShah.innerHTML = `<span class="dot" style="background:#f59e0b;"></span> Түв шахагч химцаа (cot)`;
+        titleShah.style.color = '#f59e0b';
+        fnShah.style.color = '#f59e0b';
+        fnShah.innerText = "төша = cot φ";
+        lenShah.innerText = isInfCot ? "∞" : `${(Math.abs(cotVal) * DIAMETER_MM).toFixed(1)} мм`;
+
+        if (isExact && getExactValue(deg, 'cot') !== null) {
+          ratShah.innerText = getExactValue(deg, 'cot');
+        } else {
+          let val = currentLayer === 4 ? cotVal : Math.abs(cotVal);
+          ratShah.innerText = isInfCot ? "∞" : to2Dec(val);
+        }
+
+        titleOgt.innerHTML = `<span class="dot" style="background:#06b6d4;"></span> Түв огтлогч химцаа (csc)`;
+        titleOgt.style.color = '#06b6d4';
+        fnOgt.style.color = '#06b6d4';
+        fnOgt.innerText = "тохи = csc φ";
+        lenOgt.innerText = isInfCot ? "∞" : `${(Math.abs(cscVal) * DIAMETER_MM).toFixed(1)} мм`;
+
+        if (isExact && getExactValue(deg, 'csc') !== null) {
+          ratOgt.innerText = getExactValue(deg, 'csc');
+        } else {
+          let val = currentLayer === 4 ? cscVal : Math.abs(cscVal);
+          ratOgt.innerText = isInfCot ? "∞" : to2Dec(val);
+        }
+      }
+    }
+
+    function handlePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const mouseX = clientX - rect.left - canvas.width / 2;
+      const mouseY = clientY - rect.top - canvas.height / 2;
+
+      let rad = Math.atan2(-mouseY, mouseX);
+      if (rad < 0) rad += 2 * Math.PI;
+
+      // Хэрэв Бүрэн эргэлт чагтлаагүй бөгөөд 1, 2, 3-р горим бол 0 ~ 90° дотор барина
+      if (!fullRotationMode.checked && currentLayer <= 3) {
+        if (rad > Math.PI / 2 && rad < 3 * Math.PI / 2) rad = Math.PI / 2;
+        if (rad >= 3 * Math.PI / 2) rad = 0;
+      }
+
+      angleRad = rad;
+      draw();
+    }
+
+    let isInteracting = false;
+    canvas.addEventListener('pointerdown', e => { isInteracting = true; handlePointer(e); });
+    window.addEventListener('pointermove', e => { if (isInteracting) handlePointer(e); });
+    window.addEventListener('pointerup', () => { isInteracting = false; });
+
+    draw();
+  </script>
+</body>
+</html>
